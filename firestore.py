@@ -1,64 +1,71 @@
-import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_config import db
 from datetime import datetime, timedelta
 
-# Initialize Firebase (run this once)
-cred = credentials.Certificate("serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
-db = firestore.client()
-
 def log_nutrition(user_id, date_str, nutrition_data):
-    """
-    Adds a daily nutrition log for a user.
-    :param user_id: str (e.g., "user123")
-    :param date_str: str (e.g., "2025-05-29")
-    :param nutrition_data: dict of nutrition info
-    """
-    doc_ref = db.collection("users").document(user_id).collection("daily_logs").document(date_str)
-    doc_ref.set(nutrition_data)
+    date_doc = db.collection("users").document(user_id).collection("daily_logs").document(date_str)
+    date_doc.set(nutrition_data)
     print(f"Log added for {user_id} on {date_str}")
-
 
 def get_nutrition_log(user_id, date_str, print_log=True):
     doc_ref = db.collection("users").document(user_id).collection("daily_logs").document(date_str)
     doc = doc_ref.get()
-
     if doc.exists:
+        log = doc.to_dict()
         if print_log:
-            print(f"Log for {user_id} on {date_str}:")
-            print(doc.to_dict())
-        return doc.to_dict()
+            print(f"Log for {user_id} on {date_str}:\n{log}")
+        return log
     else:
         if print_log:
             print(f"No log found for {user_id} on {date_str}")
         return None
 
-
-
-
 def get_weekly_logs(user_id, end_date_str):
     end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-    start_date = end_date - timedelta(days=6)
-
     logs = []
 
+    print(f"Weekly logs for {user_id} ({(end_date - timedelta(days=6)).date()} → {end_date.date()}):")
+
     for i in range(7):
-        current_date = start_date + timedelta(days=i)
-        date_str = current_date.strftime("%Y-%m-%d")
-        log = get_nutrition_log(user_id, date_str, print_log=False)
-
-
+        current_date = (end_date - timedelta(days=i)).strftime("%Y-%m-%d")
+        log = get_nutrition_log(user_id, current_date, print_log=False)
         if log:
-            logs.append({
-                "date": date_str,
-                **log
-            })
+            log["date"] = current_date
+            logs.append(log)
 
-    if logs:
-        print(f"\nWeekly logs for {user_id} ({start_date.date()} → {end_date.date()}):")
-        for log in logs:
-            print(log)
-    else:
-        print(f" No logs found for {user_id} in the past 7 days ending {end_date_str}")
+    logs.reverse()
+    for entry in logs:
+        print(entry)
+
 
     return logs
+
+# Set nutrition goals for a user
+def set_nutrition_goals(user_id, goals_data):
+    user_ref = db.collection("users").document(user_id)
+    user_ref.update({"goals": goals_data})
+    print(f"🎯 Goals set for {user_id}")
+
+# Get nutrition goals for a user
+def get_nutrition_goals(user_id):
+    user_ref = db.collection("users").document(user_id)
+    doc = user_ref.get()
+    if doc.exists:
+        data = doc.to_dict()
+        goals = data.get("goals", None)
+        if goals:
+            print(f"Goals for {user_id}:\n{goals}")
+            return goals
+        else:
+            print("No goals set for this user.")
+            return None
+    else:
+        print(f"User {user_id} not found.")
+        return None
+    
+# Delete a daily log
+def delete_nutrition_log(user_id, date_str):
+    log_ref = db.collection("users").document(user_id).collection("daily_logs").document(date_str)
+    log_ref.delete()
+    print(f"🗑️ Deleted log for {user_id} on {date_str}")
+
+
