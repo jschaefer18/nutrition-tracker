@@ -1,3 +1,8 @@
+# This file handles user registration and login.
+# It securely hashes passwords using bcrypt and stores them in Firestore.
+# It also checks credentials during login to authenticate users.
+
+
 import bcrypt
 from firebase_config import db
 
